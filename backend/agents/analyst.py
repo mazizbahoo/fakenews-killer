@@ -5,8 +5,7 @@ Responsibility:
     Receive the structured claims from the Reader and evaluate each
     claim for truthfulness, providing evidence and confidence scores.
 
-Currently returns hardcoded sample output.
-Replace the body of ``run()`` with a real Gemini call once prompts are ready.
+Uses Gemini via ``utils.gemini_client`` with automatic model fallback.
 """
 
 from models.schemas import AnalystOutput

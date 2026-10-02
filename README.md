@@ -1,290 +1,323 @@
-# 🕵️ FakeNews Killer
-### Autonomous Misinformation Detection & Action System for Pakistan
+# FakeNews Killer
 
-> *"It doesn't just detect fake news. It reads it, verifies it, decides what to do, and acts — all in under 15 seconds."*
+**AI-powered misinformation detection and response for Pakistan.**
 
----
+FakeNews Killer takes a WhatsApp forward, a headline, or a screenshot and runs it through a four-stage AI pipeline that extracts the claims, fact-checks them against live web sources, assesses the potential for harm, and produces ready-to-use responses: a shareable verdict card, a tracker record, and a formal platform abuse report.
 
-## 🏆 What We Built
-
-**FakeNews Killer** is a 4-agent autonomous AI pipeline that transforms raw, unverified WhatsApp forwards and news headlines into verified verdicts — and then **takes action**. No human in the loop. No stopping at "here's a summary." The system reads, thinks, decides, and executes.
-
-In Pakistan, where misinformation spreads via WhatsApp faster than any newsroom can respond, this matters.
+It supports English, Urdu, and Roman Urdu, and it favours trusted Pakistani and international news sources.
 
 ---
 
-## 🎯 Problem Statement
+## Table of contents
 
-Every day, millions of Pakistanis receive unverified news forwards — political rumours, health hoaxes, economic panic, religious misinformation. By the time a journalist or fact-checker responds, the damage is done.
-
-Existing tools either:
-- Stop at summarization (not useful)
-- Require manual journalist review (too slow)
-- Are English-only (excludes most of Pakistan)
-
-**FakeNews Killer solves all three.**
+- [Why it exists](#why-it-exists)
+- [Features](#features)
+- [How it works](#how-it-works)
+- [Mobile app](#mobile-app)
+- [Tech stack](#tech-stack)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [API reference](#api-reference)
+- [Deployment](#deployment)
+- [Project structure](#project-structure)
+- [Example](#example)
+- [Design notes](#design-notes)
+- [Limitations](#limitations)
+- [Authors](#authors)
 
 ---
 
-## 🤖 How It Works — The 4-Agent Pipeline
+## Why it exists
 
-Every input flows through four specialized AI agents, orchestrated by **Google Antigravity**:
+Millions of people in Pakistan receive unverified news forwards every day: political rumours, health hoaxes, economic panic, and religious misinformation. By the time a journalist or fact-checker responds, the message has already spread.
+
+Existing tools tend to:
+
+- stop at summarising the content instead of helping anyone act on it,
+- depend on manual review by journalists, which is too slow, or
+- support English only, which leaves out most of the country.
+
+FakeNews Killer addresses all three.
+
+## Features
+
+- **Claim extraction:** splits a message into separate claims that can each be checked.
+- **Live fact-checking:** checks each claim with Google Search grounding and prefers sources such as Dawn, Geo, ARY, The Express Tribune, The News, Reuters, and AFP.
+- **Multilingual:** detects and handles English, Urdu, and Roman Urdu.
+- **Screenshot input:** reads the text in up to five images on the device using ML Kit text recognition.
+- **Harm assessment:** rates the harm level, the affected audience, and the risk of spread, then ranks the recommended responses.
+- **Actionable outputs:**
+  - a WhatsApp-ready verdict card that includes a Roman Urdu warning,
+  - a persistent record in the misinformation tracker,
+  - a formal abuse report drafted for WhatsApp, Facebook, or X.
+- **Live progress:** the app streams each agent's progress over Server-Sent Events.
+- **Resilient model access:** if a Gemini model hits a rate limit, quota, or error, the backend automatically retries with the next model in its list.
+
+## How it works
+
+Every request passes through four specialised agents in sequence. Each agent receives the previous agent's structured output, and Pydantic validates every stage.
 
 ```
-User Input (text / screenshot)
-        │
-        ▼
-┌───────────────────┐
-│   READER AGENT    │  Extracts discrete, verifiable claims
-│                   │  Detects language (English / Urdu / Roman Urdu)
-│                   │  Flags linguistic red-flag patterns
-└────────┬──────────┘
-         │
-         ▼
-┌───────────────────┐
-│  ANALYST AGENT    │  Fact-checks each claim via Web Search
-│   [web_search]    │  Cross-references: Dawn, Geo, Reuters, AFP
-│                   │  Assigns truth score (0–100) per claim
-└────────┬──────────┘
-         │
-         ▼
-┌───────────────────┐
-│ STRATEGIST AGENT  │  Assesses harm level & affected audience
-│                   │  Generates 3–5 prioritized, actionable responses
-│                   │  Plans exactly what the Executor will do
-└────────┬──────────┘
-         │
-         ▼
-┌───────────────────┐
-│  EXECUTOR AGENT   │  Simulates 3 real actions:
-│                   │  1. Verdict Card (shareable WhatsApp card)
-│                   │  2. Tracker DB Entry (misinformation log)
-│                   │  3. Platform Abuse Report (to WhatsApp/FB/X)
-└───────────────────┘
-         │
-         ▼
-  Full JSON result → Flutter Mobile App
+ Text / screenshot (OCR on device)
+              │
+              ▼
+ ┌────────────────────────┐
+ │ 1. Reader              │  Detects the language, extracts discrete claims,
+ │                        │  flags linguistic red flags, scores suspicion
+ └───────────┬────────────┘
+             ▼
+ ┌────────────────────────┐
+ │ 2. Analyst             │  Fact-checks each claim with Google Search,
+ │    [google_search]     │  assigns a truth score (0–100), cites sources
+ └───────────┬────────────┘
+             ▼
+ ┌────────────────────────┐
+ │ 3. Strategist          │  Assesses harm, audience and spread risk,
+ │                        │  plans prioritised responses
+ └───────────┬────────────┘
+             ▼
+ ┌────────────────────────┐
+ │ 4. Executor            │  Produces the verdict card, writes the tracker
+ │                        │  entry, drafts the platform report
+ └───────────┬────────────┘
+             ▼
+     JSON response / SSE stream  →  Flutter app
 ```
 
-This is not summarization. This is **insight → decision → execution**.
+### Executor outputs
 
----
+**Verdict card:** a shareable fact-check card with:
 
-## 📱 Mobile App — 5 Screens
+- the verdict (TRUE / FALSE / MISLEADING / UNVERIFIED) and a confidence percentage,
+- the key finding in plain language and the sources consulted,
+- a Roman Urdu warning, for example *"⚠️ Yeh khabar BILKUL GALAT hai. Aagay mat bhejen."*
 
-Built in Flutter. Runs on Android.
+**Tracker entry:** a record saved to the misinformation tracker:
 
-| Screen | What It Shows |
-|--------|--------------|
-| **Input** | Paste a WhatsApp message or upload a screenshot |
-| **Loading** | Live agent ticker — watch all 4 agents activate in real time |
-| **Results** | Verdict badge (TRUE / FALSE / MISLEADING), confidence %, per-claim breakdown |
-| **Verdict Card** | Shareable visual card with Roman Urdu warning — ready to send back into WhatsApp |
-| **Tracker Dashboard** | Full misinformation database — past entries, spread risk, categories |
-
----
-
-## ⚡ Action Simulation — What the Executor Actually Does
-
-This satisfies the hackathon's **critical requirement**: simulate execution of at least one action.
-
-We simulate **three**:
-
-### Action 1 — Verdict Card Generated
-A fully structured, WhatsApp-shareable fact-check card containing:
-- Verdict (TRUE / FALSE / MISLEADING / UNVERIFIED)
-- Confidence percentage
-- Key finding in plain English
-- Sources (Dawn, Geo, Reuters, etc.)
-- Roman Urdu warning: *"⚠️ Yeh khabar BILKUL GALAT hai. Aagay mat bhejen."*
-- Timestamp and fact-checker attribution
-
-### Action 2 — Tracker Database Entry Created
-A structured record inserted into the misinformation tracker database:
 ```json
 {
-  "entry_id": "FNK-20241205-042",
   "claim_text": "...",
   "verdict": "false",
   "category": "political",
+  "language": "roman_urdu",
   "spread_risk": "high",
   "sources_cited": ["Dawn.com", "Geo.tv"],
-  "tags": ["election", "WhatsApp forward"]
+  "tags": ["election", "whatsapp-forward"],
+  "status": "active",
+  "confidence_score": 91
 }
 ```
 
-### Action 3 — Platform Abuse Report Filed
-A formal, professionally written content abuse report drafted for submission to WhatsApp, Facebook, or X — including harm category, evidence summary, and recommended platform action.
+**Platform report:** a formal content abuse report covering the harm category, an evidence summary, and the recommended platform action. You can review it and submit it to WhatsApp, Facebook, or X.
 
----
+**Execution log:** a timestamped record of every step:
 
-## 🔄 Before → After State Change
-
-The app includes a **Before/After panel** showing exactly what changed:
-
-**Before:** Unverified claim — spreading, no fact-check available, spread risk unknown.
-
-**After:**
-- ✅ Verdict card created and ready to share
-- ✅ Tracker entry logged (FNK-YYYYMMDD-XXX)
-- ✅ Platform report drafted and ready to submit
-
-Plus a scrollable **Agent Execution Log** — a terminal-style trace of every decision made:
 ```
-[09:23:01] Reader Agent    → 2 claims extracted
-[09:23:03] Analyst Agent   → web_search called (3 queries)
-[09:23:07] Analyst Agent   → verdict: FALSE (confidence: 91%)
-[09:23:08] Strategist Agent → 3 actions recommended
-[09:23:09] Executor Agent  → verdict card generated
-[09:23:09] Executor Agent  → tracker entry FNK-20241205-042 created
-[09:23:10] Executor Agent  → platform report drafted
-[09:23:10] Pipeline complete
+[09:23:01] Reader      → 2 claims extracted
+[09:23:03] Analyst     → google_search (3 queries)
+[09:23:07] Analyst     → verdict: FALSE (confidence: 91%)
+[09:23:08] Strategist  → 3 actions recommended
+[09:23:09] Executor    → verdict card generated
+[09:23:09] Executor    → tracker entry created
+[09:23:10] Executor    → platform report drafted
 ```
 
----
+## Mobile app
 
-## 🛠️ Tech Stack
+The client is built in Flutter. Android is the primary target.
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| **Agent Orchestration** | Google Antigravity | Core workflow — all 4 agents run through Antigravity's Agent Manager |
-| **LLM** | Gemini 3 Pro (via Antigravity) | Reasoning, analysis, content generation |
-| **Web Search Tool** | Antigravity built-in | Live fact-checking against real sources |
-| **Backend** | FastAPI (Python 3.11) | Agent pipeline, REST API, data layer |
-| **Database** | SQLite | Misinformation tracker persistence |
-| **OCR** | pytesseract | Screenshot → text extraction |
-| **Mobile App** | Flutter (Android) | Full mobile UI, 5 screens |
-| **Schema Validation** | Pydantic v2 | Strict JSON output from every agent |
+| Screen | Purpose |
+|---|---|
+| **Splash** | Branding and startup |
+| **Input** | Paste a message or attach up to five screenshots |
+| **Loading** | A live ticker that shows each agent finishing in real time |
+| **Results** | The overall verdict, the confidence score, and a breakdown for each claim |
+| **Verdict Card** | A shareable card, exported as an image through the system share sheet |
+| **Before / After** | What the pipeline changed, plus the full execution log |
+| **Tracker** | A dashboard of past entries, their categories, and their spread risk |
 
----
+## Tech stack
 
-## 🌐 How Google Antigravity Is Used
+| Layer | Technology |
+|---|---|
+| LLM | Google Gemini (`google-genai` SDK), with model fallback |
+| Fact-checking | Gemini Google Search grounding tool |
+| Backend | FastAPI, Uvicorn, Python 3.11+ |
+| Validation | Pydantic v2 |
+| Database | Google Cloud Firestore |
+| OCR | Google ML Kit Text Recognition (on device) |
+| Mobile | Flutter (Dart ≥ 3.8) |
+| Hosting | Google Cloud Run (Docker) |
 
-Google Antigravity is **central** to this system — not bolted on.
-
-- **All 4 agents are defined and orchestrated in Antigravity's Agent Manager.** Each agent is a separate reasoning unit with its own system prompt, tools, and output schema.
-- **The web_search tool** is enabled on the Analyst Agent, allowing live fact-checking against real news sources at runtime.
-- **The Antigravity Manager View** provides a complete visual trace of every agent activation, tool call, and decision — this is the agent trace log submitted with the project.
-- The FastAPI backend calls Antigravity's Gemini 3 Pro endpoint for each agent, passing context from the previous agent's output — creating a true chained reasoning pipeline.
-
-This is not a wrapper. Antigravity handles the reasoning, the tool execution, and the agent coordination.
-
----
-
-## 🚀 Running the Project
+## Getting started
 
 ### Prerequisites
-- Python 3.11+
-- Flutter SDK
-- Google Antigravity API key (Gemini 3 Pro access)
 
-### Backend Setup
+- Python 3.11 or newer
+- Flutter SDK (Dart 3.8 or newer) and an Android device or emulator
+- A Google AI Studio / Gemini API key
+- A Google Cloud project with Firestore enabled, plus credentials that can access it (for local development, `gcloud auth application-default login` is enough)
+
+### 1. Run the backend
+
 ```bash
-cd fakenews_killer
+cd backend
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env
-# Add your GOOGLE_API_KEY to .env
-uvicorn main:app --reload
+
+echo "GOOGLE_API_KEY=your-gemini-api-key" > .env.local
+
+uvicorn main:app --reload --port 8000
 ```
 
-### Flutter App Setup
+Interactive API docs are then available at <http://localhost:8000/docs>.
+
+When the tracker collection is empty, the backend adds a few example entries on first startup so the dashboard has data to show.
+
+### 2. Run the mobile app
+
+The app points to the hosted Cloud Run API by default. To use your local backend instead, open `app/lib/services/api_service.dart`, comment out the production `baseUrl`, and uncomment the local development getter. On an Android emulator, that getter uses `10.0.2.2:8000`.
+
 ```bash
-cd fakenews_killer_app
+cd app
 flutter pub get
 flutter run
 ```
 
-### API Endpoints
+## Configuration
+
+| Variable | Required | Description |
+|---|---|---|
+| `GOOGLE_API_KEY` | Yes | The Gemini API key that all four agents use |
+| `GOOGLE_CLOUD_PROJECT` | Outside GCP | The Firestore project ID. Detected automatically on Cloud Run |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Outside GCP | Path to a service-account JSON file, if you don't use ADC |
+| `PORT` | No | The server port inside the container (default `8080`) |
+
+The backend loads `backend/.env.local` first and then `backend/.env`. Both files are git-ignored.
+
+To change the order in which Gemini models are tried, edit `FALLBACK_MODELS` in `backend/utils/gemini_client.py`.
+
+## API reference
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Health check, returns `{"status": "ok"}` |
+| `POST` | `/analyze` | Runs the full pipeline and returns one JSON response |
+| `POST` | `/analyze/stream` | Runs the pipeline and streams progress as Server-Sent Events |
+| `GET` | `/tracker` | Lists every tracker entry, newest first |
+| `POST` | `/tracker` | Adds a tracker entry manually |
+
+**Request body** for `/analyze` and `/analyze/stream`:
+
+```json
+{ "text": "URGENT! PM ne resign kar diya..." }
 ```
-POST /analyze     →  Run full 4-agent pipeline on input text
-GET  /tracker     →  Retrieve all misinformation tracker entries
-POST /tracker     →  Insert new tracker entry
-GET  /health      →  Health check
+
+**Response:** an object with `reader`, `analyst`, `strategist`, and `executor` keys, one per pipeline stage. The full schemas are in `backend/models/schemas.py`, and you can also browse them at `/docs`.
+
+**Stream events:**
+
+```
+data: {"agent": "reader",     "status": "complete"}
+data: {"agent": "analyst",    "status": "complete"}
+data: {"agent": "strategist", "status": "complete"}
+data: {"agent": "executor",   "status": "complete"}
+data: {"agent": "pipeline",   "status": "complete", "result": { ... }}
 ```
 
----
+If a stage fails, the stream sends `{"agent": "pipeline", "status": "error", "error": "..."}`.
 
-## 📊 Example: End-to-End Flow
+## Deployment
 
-**Input (Roman Urdu WhatsApp forward):**
+The backend ships with a `Dockerfile` for Google Cloud Run:
+
+```bash
+cd backend
+gcloud run deploy fakenews-killer-api \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --set-env-vars GOOGLE_API_KEY=your-gemini-api-key
+```
+
+Make sure the Cloud Run service account has the **Cloud Datastore User** role so that it can read from and write to Firestore. For production, store the API key in Secret Manager and pass it with `--set-secrets` rather than as a plain environment variable.
+
+To build a release APK of the app:
+
+```bash
+cd app
+flutter build apk --release
+```
+
+## Project structure
+
+```
+fakenews-killer/
+├── backend/
+│   ├── main.py                 # FastAPI app and routes
+│   ├── agents/
+│   │   ├── reader.py           # Stage 1: language detection and claim extraction
+│   │   ├── analyst.py          # Stage 2: fact-checking with Google Search
+│   │   ├── strategist.py       # Stage 3: harm assessment and action planning
+│   │   └── executor.py         # Stage 4: verdict card, tracker entry, report
+│   ├── models/
+│   │   ├── schemas.py          # Pydantic request/response models
+│   │   └── database.py         # Firestore tracker persistence
+│   ├── utils/
+│   │   ├── gemini_client.py    # Gemini calls with model fallback
+│   │   └── ocr.py              # Server-side Gemini vision OCR helper
+│   ├── requirements.txt
+│   └── Dockerfile
+└── app/                        # Flutter client
+    ├── lib/
+    │   ├── main.dart
+    │   ├── models/             # AnalysisResult, TrackerEntry
+    │   ├── services/           # ApiService (REST + SSE)
+    │   ├── screens/            # Splash, Input, Loading, Results,
+    │   │                       # Verdict Card, Before/After, Tracker
+    │   └── widgets/            # Shared scaffold and drawer
+    ├── assets/
+    └── pubspec.yaml
+```
+
+## Example
+
+**Input (a Roman Urdu WhatsApp forward):**
+
 ```
 URGENT! PM ne resign kar diya aur army ne complete control le lia hai.
 Sab channels band hone wale hain. SHARE KAREIN JALDI!
 ```
 
-**Pipeline Output:**
+**Result:**
 
-| Agent | Output |
-|-------|--------|
-| Reader | 2 claims extracted: (1) PM resigned, (2) Army took control. Suspicion score: 9/10. Red flags: urgency phrase, unnamed source, ALL CAPS |
-| Analyst | Claim 1: FALSE (score: 4/100) — Dawn, Geo, Tribune all confirm no resignation. Claim 2: FALSE (score: 6/100) — No credible military action reported |
-| Strategist | Harm: HIGH. Audience: General Pakistani public. Actions: public_correction (immediate), tracker_log (immediate), platform_flag (within 24h) |
-| Executor | Verdict card generated. Tracker entry FNK-20241205-042 created. WhatsApp report drafted. |
+| Stage | Output |
+|---|---|
+| Reader | 2 claims: (1) the PM resigned, (2) the army took control. Suspicion 9/10. Red flags: urgency, unnamed source, ALL CAPS |
+| Analyst | Claim 1 is **FALSE** (4/100): no resignation reported by Dawn, Geo, or Tribune. Claim 2 is **FALSE** (6/100): no credible reports of military action |
+| Strategist | Harm: **HIGH**. Audience: the general public. Actions: public correction (immediate), tracker log (immediate), platform flag (within 24h) |
+| Executor | Verdict card generated, tracker entry created, WhatsApp report drafted |
 
----
+## Design notes
 
-## 🌍 Domain Relevance — Why Pakistan
+- **A chain of agents instead of one prompt.** Each agent has one narrow job and a strict output schema, which gives more reliable structured output than a single large prompt.
+- **Roman Urdu is fully supported.** The Reader treats `roman_urdu` as its own language, separate from English and Urdu.
+- **Spread risk is a key metric.** The system records how likely a claim is to go viral, not only whether it is true.
+- **A person approves before anything leaves the app.** The pipeline drafts the platform reports and prepares the verdict cards, but a person still decides to share or submit them.
 
-- Pakistan is ranked among the top countries for WhatsApp misinformation spread
-- Roman Urdu and mixed-language content is almost entirely ignored by existing fact-check tools
-- The system handles English, Urdu, and Roman Urdu natively
-- Sources are prioritized for Pakistani journalism: Dawn, Geo, ARY, Tribune, The News
-- Platform reports can target WhatsApp, Facebook, and Twitter/X — the primary vectors in Pakistan
+## Limitations
 
----
+- Verdicts are generated by AI and can be wrong. Treat them as decision support, not as a final ruling.
+- Fact-checking quality depends on how much a topic has been covered online. Very recent or very local claims may come back as `UNVERIFIED`.
+- On-device OCR uses the Latin-script recogniser, so text in Urdu (Nastaliq) script inside images may not be extracted reliably.
+- The API has no authentication or rate limiting. Add both before you expose it publicly at scale.
 
-## 💡 Design Decisions & Assumptions
+## Authors
 
-- **Agent chaining over single-prompt:** Each agent has a narrow, well-defined responsibility. This produces better structured outputs than a single large prompt.
-- **Simulated actions are complete:** The executor generates full, submission-ready outputs — not placeholders. The verdict card, tracker entry, and platform report are all fully populated.
-- **Roman Urdu is a first-class language:** The Reader Agent explicitly detects and handles roman_urdu as a language type.
-- **Spread risk is a first-class metric:** The system explicitly assesses and logs viral potential, not just truth value.
-- **No real personal data used:** All demo inputs are inspired by real news categories but contain no real personal information.
-
----
-
-## 📁 Project Structure
-
-```
-fakenews_killer/
-├── main.py                  # FastAPI app, endpoint routing
-├── agents/
-│   ├── reader.py            # Agent 1 — claim extraction
-│   ├── analyst.py           # Agent 2 — fact-checking + web search
-│   ├── strategist.py        # Agent 3 — action planning
-│   └── executor.py          # Agent 4 — action simulation
-├── models/
-│   ├── schemas.py           # Pydantic request/response models
-│   └── database.py          # SQLite tracker DB setup
-├── utils/
-│   └── ocr.py               # pytesseract screenshot → text
-├── data/                    # SQLite DB (auto-created)
-├── requirements.txt
-└── .env.example
-
-fakenews_killer_app/         # Flutter mobile app
-├── lib/
-│   ├── screens/
-│   │   ├── input_screen.dart
-│   │   ├── loading_screen.dart
-│   │   ├── results_screen.dart
-│   │   ├── verdict_card_screen.dart
-│   │   ├── tracker_screen.dart
-│   │   └── before_after_screen.dart
-│   └── main.dart
-└── pubspec.yaml
-```
+- **Muhammad Aziz**: backend, agent pipeline, Flutter app, API integration
+- **Muhammad Zakir**: research, content, documentation, QA
 
 ---
 
-## 👥 Team
-
-**Muhammad Aziz** — Backend, agent pipeline, Flutter app, API integration
-
-**Muhammad Zakir** — Research, demo content, documentation, demo video, QA testing
-
-Built at the Google Antigravity Hackathon, Lahore — May 2026.
-
----
-
-*FakeNews Killer — Because the truth deserves a faster distribution network than the lie.*
+*FakeNews Killer: because the truth deserves a faster distribution network than the lie.*

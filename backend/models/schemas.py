@@ -150,7 +150,7 @@ class AnalyzeResponse(BaseModel):
 
 
 class TrackerEntry(BaseModel):
-    """A single misinformation tracker row (maps 1-to-1 with the SQLite table)."""
+    """A single misinformation tracker row (maps 1-to-1 with a Firestore document)."""
     id: Optional[str] = None
     claim_text: str
     verdict: str

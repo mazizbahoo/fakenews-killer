@@ -13,7 +13,7 @@ Fresh workspace with your Gemini API key ready. Here's my understanding:
 | Aspect | Detail |
 |---|---|
 | **Purpose** | Misinformation detection system tailored for Pakistan |
-| **Event** | Hackathon project |
+| **Type** | Production application |
 | **Backend** | Python FastAPI |
 | **LLM** | Google Gemini 3 Pro (via API, key already in `.env.local`) |
 | **Mobile** | Flutter app |

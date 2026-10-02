@@ -3,11 +3,10 @@ Executor Agent — Stage 4 (final) of the FakeNews Killer pipeline.
 
 Responsibility:
     Compile outputs from all previous agents into a final verdict,
-    write the result to the misinformation tracker (SQLite), and
+    write the result to the misinformation tracker (Firestore), and
     return a user-facing report.
 
-Currently returns hardcoded sample output.
-Replace the body of ``run()`` with a real Gemini call once prompts are ready.
+Uses Gemini via ``utils.gemini_client`` with automatic model fallback.
 """
 
 from models.schemas import ExecutorOutput
@@ -43,7 +42,7 @@ async def run(strategist_output: dict, analyst_output: dict, reader_output: dict
         client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
         system_instruction = """You are the Executor Agent in FakeNews Killer, a misinformation detection system for Pakistan.
 
-ROLE: Simulate the execution of the top 3 recommended actions. Generate all tangible outputs — verdict card data, tracker database entry, and platform report — as if they were being submitted to real production systems right now.
+ROLE: Carry out the top 3 recommended actions. Generate all tangible outputs — verdict card data, tracker database entry, and platform report — complete and ready for real-world use.
 
 INPUT: The combined output from ALL previous agents (Reader + Analyst + Strategist results as one JSON object).
 

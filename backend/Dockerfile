@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create data directory for SQLite (ephemeral on Cloud Run, but needed at runtime)
+# Create local data directory
 RUN mkdir -p /app/data
 
 # Cloud Run uses PORT env var (defaults to 8080)

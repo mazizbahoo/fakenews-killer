@@ -5,8 +5,7 @@ Responsibility:
     Accept raw text input, clean it, detect the language,
     and extract individual factual claims for downstream analysis.
 
-Currently returns hardcoded sample output.
-Replace the body of ``run()`` with a real Gemini call once prompts are ready.
+Uses Gemini via ``utils.gemini_client`` with automatic model fallback.
 """
 
 from models.schemas import ReaderOutput

@@ -5,8 +5,7 @@ Responsibility:
     Take the Analyst's evaluation and determine severity, category,
     spread risk, Pakistan-specific context, and recommended actions.
 
-Currently returns hardcoded sample output.
-Replace the body of ``run()`` with a real Gemini call once prompts are ready.
+Uses Gemini via ``utils.gemini_client`` with automatic model fallback.
 """
 
 from models.schemas import StrategistOutput
