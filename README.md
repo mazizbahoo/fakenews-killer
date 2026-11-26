@@ -313,11 +313,6 @@ Sab channels band hone wale hain. SHARE KAREIN JALDI!
 - On-device OCR uses the Latin-script recogniser, so text in Urdu (Nastaliq) script inside images may not be extracted reliably.
 - The API has no authentication or rate limiting. Add both before you expose it publicly at scale.
 
-## Authors
-
-- **Muhammad Aziz**: backend, agent pipeline, Flutter app, API integration
-- **Muhammad Zakir**: research, content, documentation, QA
-
 ---
 
 *FakeNews Killer: because the truth deserves a faster distribution network than the lie.*
